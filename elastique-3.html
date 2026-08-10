@@ -1,0 +1,574 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Élastique — raccourcir ou rallonger un lien</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600&family=IBM+Plex+Mono:wght@400;500&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --stone:#E8EAE3;
+    --paper:#FCFCFA;
+    --ink:#15181B;
+    --muted:#767C74;
+    --emerald:#0E6B52;
+    --emerald-soft:#D9E7E1;
+    --line:rgba(21,24,27,.14);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{
+    background:var(--stone);color:var(--ink);
+    font-family:"Instrument Sans",system-ui,sans-serif;
+    -webkit-font-smoothing:antialiased;
+    display:flex;flex-direction:column;align-items:center;
+    padding:56px 20px 72px;min-height:100%;
+  }
+  .wrap{width:100%;max-width:620px}
+
+  .eyebrow{font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);font-weight:500}
+  h1{
+    font-family:"Bricolage Grotesque",sans-serif;
+    font-size:clamp(44px,11vw,68px);font-weight:600;line-height:.95;
+    margin:14px 0 0;letter-spacing:-.03em;
+    transition:letter-spacing .5s cubic-bezier(.22,1,.36,1);
+  }
+  body[data-mode="lengthen"] h1{letter-spacing:.07em}
+  .lede{margin-top:14px;color:var(--muted);font-size:15px;line-height:1.5;max-width:44ch}
+
+  .card{background:var(--paper);border:1px solid var(--line);border-radius:14px;margin-top:32px;padding:22px}
+
+  .switch{position:relative;display:grid;grid-template-columns:1fr 1fr;background:var(--stone);border-radius:10px;padding:4px}
+  .thumb{
+    position:absolute;top:4px;left:4px;width:calc(50% - 4px);height:calc(100% - 8px);
+    background:var(--paper);border-radius:7px;box-shadow:0 1px 3px rgba(21,24,27,.13);
+    transition:transform .35s cubic-bezier(.22,1,.36,1);
+  }
+  body[data-mode="lengthen"] .thumb{transform:translateX(100%)}
+  .switch button{
+    position:relative;z-index:1;background:none;border:0;cursor:pointer;
+    font:inherit;font-size:14px;font-weight:500;color:var(--muted);
+    padding:9px 4px;border-radius:7px;transition:color .25s ease;
+  }
+  .switch button[aria-selected="true"]{color:var(--ink)}
+
+  label.field{display:block;margin-top:20px}
+  .field-label{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);font-weight:500}
+  input[type="url"]{
+    width:100%;margin-top:9px;background:transparent;border:0;border-bottom:1.5px solid var(--line);
+    padding:10px 0 12px;font-family:"IBM Plex Mono",monospace;font-size:15px;color:var(--ink);
+    transition:border-color .2s ease;
+  }
+  input[type="url"]::placeholder{color:#A9AEA6}
+  input[type="url"]:focus{outline:0;border-bottom-color:var(--emerald)}
+
+  /* réglage de longueur */
+  .sizer{margin-top:22px;display:none}
+  body[data-mode="lengthen"] .sizer{display:block}
+  .sizer-head{display:flex;justify-content:space-between;align-items:baseline}
+  .sizer-val{font-family:"IBM Plex Mono",monospace;font-size:13px;color:var(--ink)}
+  input[type="range"]{
+    -webkit-appearance:none;appearance:none;width:100%;margin-top:14px;background:transparent;
+  }
+  input[type="range"]::-webkit-slider-runnable-track{height:4px;background:var(--stone);border-radius:99px}
+  input[type="range"]::-moz-range-track{height:4px;background:var(--stone);border-radius:99px}
+  input[type="range"]::-webkit-slider-thumb{
+    -webkit-appearance:none;width:18px;height:18px;margin-top:-7px;border-radius:50%;
+    background:var(--emerald);cursor:pointer;border:3px solid var(--paper);box-shadow:0 1px 3px rgba(21,24,27,.25);
+  }
+  input[type="range"]::-moz-range-thumb{
+    width:14px;height:14px;border-radius:50%;background:var(--emerald);cursor:pointer;
+    border:3px solid var(--paper);box-shadow:0 1px 3px rgba(21,24,27,.25);
+  }
+
+  .go{
+    width:100%;margin-top:22px;background:var(--emerald);color:#F4F8F6;border:0;border-radius:10px;
+    padding:14px;font:inherit;font-size:15px;font-weight:600;cursor:pointer;
+    transition:background .2s ease,transform .1s ease;
+  }
+  .go:hover{background:#0B5742}
+  .go:active{transform:scale(.99)}
+  .go[disabled]{opacity:.55;cursor:default;transform:none}
+  :focus-visible{outline:2px solid var(--emerald);outline-offset:3px;border-radius:4px}
+
+  .note{margin-top:16px;font-size:13px;line-height:1.5;color:var(--muted);border-left:2px solid var(--line);padding-left:12px;display:none}
+  body[data-mode="lengthen"] .note.local{display:block}
+  .msg{margin-top:18px;font-size:14px;line-height:1.5;border-left:2px solid #C2443C;padding-left:12px;color:#7A2E29;display:none}
+  .msg.show{display:block}
+
+  .out{margin-top:22px;display:none}
+  .out.show{display:block;animation:rise .4s cubic-bezier(.22,1,.36,1)}
+  @keyframes rise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+  .out-inner{border-top:1px solid var(--line);padding-top:20px}
+
+  .result-row{display:flex;align-items:flex-start;gap:12px}
+  .result-link{
+    flex:1;min-width:0;max-height:150px;overflow-y:auto;
+    font-family:"IBM Plex Mono",monospace;font-size:15px;color:var(--emerald);
+    text-decoration:none;overflow-wrap:anywhere;line-height:1.45;
+  }
+  .result-link:hover{text-decoration:underline}
+  .copy{
+    flex:none;background:var(--emerald-soft);color:var(--emerald);border:0;border-radius:8px;
+    padding:9px 14px;font:inherit;font-size:13px;font-weight:600;cursor:pointer;transition:background .2s ease;
+  }
+  .copy:hover{background:#C8DCD4}
+
+  .bars{margin-top:22px;display:grid;gap:11px}
+  .bar-row{display:grid;grid-template-columns:64px 1fr 52px;align-items:center;gap:12px}
+  .bar-tag{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);font-weight:500}
+  .bar-track{height:6px;background:var(--stone);border-radius:99px;overflow:hidden}
+  .bar-fill{height:100%;width:0;border-radius:99px;background:#C2C7BE;transition:width .7s cubic-bezier(.22,1,.36,1)}
+  .bar-row.is-result .bar-fill{background:var(--emerald)}
+  .bar-num{font-family:"IBM Plex Mono",monospace;font-size:13px;color:var(--muted);text-align:right}
+  .bar-row.is-result .bar-num{color:var(--ink)}
+  .delta{margin-top:14px;font-size:13px;color:var(--muted)}
+  .delta b{color:var(--ink);font-weight:600}
+
+  .history{margin-top:30px;display:none}
+  .history.show{display:block}
+  .history h2{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);font-weight:500}
+  .history ul{list-style:none;margin-top:12px}
+  .history li{
+    display:flex;gap:12px;align-items:baseline;padding:11px 0;border-bottom:1px solid var(--line);
+    font-family:"IBM Plex Mono",monospace;font-size:13px;
+  }
+  .history li:last-child{border-bottom:0}
+  .history .op{
+    flex:none;font-family:"Instrument Sans",sans-serif;font-size:10px;letter-spacing:.1em;
+    text-transform:uppercase;color:var(--muted);width:64px;
+  }
+  .history a{color:var(--ink);text-decoration:none;overflow-wrap:anywhere;display:block;max-height:56px;overflow:hidden}
+  .history a:hover{color:var(--emerald)}
+
+  footer{margin-top:36px;font-size:12px;color:var(--muted);line-height:1.6}
+
+  /* écran de redirection */
+  .relay{display:none;width:100%;max-width:620px}
+  body.is-relay .wrap{display:none}
+  body.is-relay .relay{display:block}
+  .relay .dest{
+    margin-top:12px;font-family:"IBM Plex Mono",monospace;font-size:15px;color:var(--emerald);
+    overflow-wrap:anywhere;line-height:1.45;
+  }
+  .relay .count{margin-top:20px;font-size:14px;color:var(--muted)}
+  .relay .count b{font-family:"IBM Plex Mono",monospace;color:var(--ink)}
+
+  @media (max-width:480px){
+    body{padding:40px 16px 56px}
+    .card{padding:18px}
+    .bar-row{grid-template-columns:52px 1fr 46px;gap:9px}
+  }
+  @media (prefers-reduced-motion:reduce){
+    *{transition-duration:.01ms !important;animation-duration:.01ms !important}
+  }
+</style>
+</head>
+<body data-mode="shorten">
+
+<div class="wrap">
+  <header>
+    <p class="eyebrow">Outil de liens</p>
+    <h1 id="wordmark">Élastique</h1>
+    <p class="lede" id="lede">Collez une adresse longue, récupérez une version courte, prête à partager.</p>
+  </header>
+
+  <main class="card">
+    <div class="switch" role="tablist" aria-label="Sens de la transformation">
+      <span class="thumb" aria-hidden="true"></span>
+      <button role="tab" id="tab-shorten" aria-selected="true">Raccourcir</button>
+      <button role="tab" id="tab-lengthen" aria-selected="false">Rallonger</button>
+    </div>
+
+    <label class="field">
+      <span class="field-label" id="inputLabel">Lien à raccourcir</span>
+      <input type="url" id="input" placeholder="https://exemple.com/page/tres/longue?ref=1" spellcheck="false" autocomplete="off">
+    </label>
+
+    <div class="sizer">
+      <div class="sizer-head">
+        <span class="field-label">Longueur visée</span>
+        <span class="sizer-val"><span id="sizeVal">600</span> caractères</span>
+      </div>
+      <input type="range" id="size" min="150" max="3000" step="50" value="600" aria-label="Longueur visée en caractères">
+    </div>
+
+    <button class="go" id="go">Raccourcir le lien</button>
+
+    <p class="note local" id="localNote"></p>
+    <p class="msg" id="msg"></p>
+
+    <section class="out" id="out" aria-live="polite">
+      <div class="out-inner">
+        <div class="result-row">
+          <a class="result-link" id="resultLink" href="#" target="_blank" rel="noopener noreferrer"></a>
+          <button class="copy" id="copy">Copier</button>
+        </div>
+        <div class="bars">
+          <div class="bar-row">
+            <span class="bar-tag">Départ</span>
+            <span class="bar-track"><span class="bar-fill" id="barA"></span></span>
+            <span class="bar-num" id="numA">0</span>
+          </div>
+          <div class="bar-row is-result">
+            <span class="bar-tag" id="tagB">Court</span>
+            <span class="bar-track"><span class="bar-fill" id="barB"></span></span>
+            <span class="bar-num" id="numB">0</span>
+          </div>
+        </div>
+        <p class="delta" id="delta"></p>
+      </div>
+    </section>
+  </main>
+
+  <section class="history" id="history">
+    <h2>Cette session</h2>
+    <ul id="historyList"></ul>
+  </section>
+
+  <footer id="footer">
+    Les liens courts passent par spoo.me, cleanuri, is.gd ou TinyURL, selon celui qui répond. Les liens longs pointent vers cette page, qui redirige vers la destination. Rien n’est enregistré.
+  </footer>
+</div>
+
+<section class="relay">
+  <p class="eyebrow">Redirection</p>
+  <h1 style="letter-spacing:-.03em">Presque arrivé</h1>
+  <p class="lede">Ce lien mène à&nbsp;:</p>
+  <p class="dest" id="dest"></p>
+  <p class="count">Ouverture dans <b id="count">3</b> s.</p>
+  <button class="go" id="now" style="max-width:280px">Continuer maintenant</button>
+</section>
+
+<script>
+(function () {
+  const qs = new URLSearchParams(location.search);
+
+  /* ---------- mode redirection ---------- */
+  const target = qs.get('go');
+  if (target) {
+    let dest = null;
+    try {
+      const u = new URL(target);
+      if (u.protocol === 'http:' || u.protocol === 'https:') dest = u.href;
+    } catch (e) {}
+
+    document.body.classList.add('is-relay');
+    const destEl = document.getElementById('dest');
+
+    if (!dest) {
+      destEl.textContent = 'Destination illisible — ce lien est cassé.';
+      document.querySelector('.relay .count').style.display = 'none';
+      document.getElementById('now').style.display = 'none';
+      return;
+    }
+
+    destEl.textContent = dest;
+    const goNow = () => { location.replace(dest); };
+    document.getElementById('now').addEventListener('click', goNow);
+
+    let n = 3;
+    const countEl = document.getElementById('count');
+    const t = setInterval(() => {
+      n--;
+      countEl.textContent = n;
+      if (n <= 0) { clearInterval(t); goNow(); }
+    }, 1000);
+    return;
+  }
+
+  /* ---------- application ---------- */
+  const body        = document.body;
+  const input       = document.getElementById('input');
+  const go          = document.getElementById('go');
+  const msg         = document.getElementById('msg');
+  const out         = document.getElementById('out');
+  const link        = document.getElementById('resultLink');
+  const copyBtn     = document.getElementById('copy');
+  const barA        = document.getElementById('barA');
+  const barB        = document.getElementById('barB');
+  const numA        = document.getElementById('numA');
+  const numB        = document.getElementById('numB');
+  const tagB        = document.getElementById('tagB');
+  const delta       = document.getElementById('delta');
+  const lede        = document.getElementById('lede');
+  const inputLabel  = document.getElementById('inputLabel');
+  const size        = document.getElementById('size');
+  const sizeVal     = document.getElementById('sizeVal');
+  const localNote   = document.getElementById('localNote');
+  const historyEl   = document.getElementById('history');
+  const historyList = document.getElementById('historyList');
+  const tabs = {
+    shorten:  document.getElementById('tab-shorten'),
+    lengthen: document.getElementById('tab-lengthen')
+  };
+
+  const COPY = {
+    shorten: {
+      lede:'Collez une adresse longue, récupérez une version courte, prête à partager.',
+      label:'Lien à raccourcir', button:'Raccourcir le lien',
+      placeholder:'https://exemple.com/page/tres/longue?ref=1', tag:'Court'
+    },
+    lengthen: {
+      lede:'Collez une adresse, choisissez une longueur absurde. Le lien reste cliquable et mène au bon endroit.',
+      label:'Lien à rallonger', button:'Rallonger le lien',
+      placeholder:'https://exemple.com', tag:'Rallongé'
+    }
+  };
+
+  const WORDS = ['veuillez','patienter','encore','un','peu','le','lien','continue','plus','loin','vraiment',
+    'beaucoup','tres','long','chemin','faisant','couloir','detour','virage','ligne','droite','presque',
+    'fini','pas','tout','fait','allez','courage','on','y','est','cette','fois','promis','dernier','effort',
+    'toujours','la','bientot','termine','encore','trois','metres','tenez','bon'];
+  const KEYS = ['etape','couloir','detour','virage','segment','tronçon','palier','relais'];
+
+  let mode = 'shorten';
+
+  function baseUrl(){ return location.origin + location.pathname; }
+  function isLocal(){ return location.protocol === 'file:' || location.origin === 'null'; }
+  function isSandboxed(){ return location.origin === 'null' || window.self !== window.top; }
+
+  localNote.textContent = isLocal()
+    ? 'Page ouverte en local : le lien généré ne s’ouvrira que sur cet appareil. Mettez le fichier en ligne (Vercel, GitHub Pages…) pour des liens partageables.'
+    : 'Le lien généré passe par cette page avant d’ouvrir la destination.';
+
+  function setMode(next){
+    mode = next;
+    body.dataset.mode = next;
+    tabs.shorten.setAttribute('aria-selected', String(next === 'shorten'));
+    tabs.lengthen.setAttribute('aria-selected', String(next === 'lengthen'));
+    const c = COPY[next];
+    lede.textContent = c.lede;
+    inputLabel.textContent = c.label;
+    go.textContent = c.button;
+    input.placeholder = c.placeholder;
+    tagB.textContent = c.tag;
+    hideResult();
+    input.focus();
+  }
+  tabs.shorten.addEventListener('click', () => setMode('shorten'));
+  tabs.lengthen.addEventListener('click', () => setMode('lengthen'));
+
+  size.addEventListener('input', () => { sizeVal.textContent = size.value; });
+
+  function hideResult(){
+    out.classList.remove('show');
+    msg.classList.remove('show');
+    barA.style.width = '0';
+    barB.style.width = '0';
+  }
+  function fail(text){
+    out.classList.remove('show');
+    msg.textContent = text;
+    msg.classList.add('show');
+  }
+  function normalize(value){
+    let v = value.trim();
+    if (!v) return null;
+    if (!/^https?:\/\//i.test(v)) v = 'https://' + v;
+    try {
+      const u = new URL(v);
+      if (!u.hostname.includes('.')) return null;
+      return u.href;
+    } catch { return null; }
+  }
+  const pick = a => a[Math.floor(Math.random() * a.length)];
+
+  /* ---------- raccourcir ----------
+     Six services essayés à la suite. Les deux premiers passent par JSONP,
+     les autres par fetch : selon l'environnement, l'un ou l'autre passe. */
+
+  /* JSONP : passe par une balise script, donc ignore les blocages CORS
+     qui frappent fetch() quand la page est ouverte en fichier local. */
+  function jsonp(url, timeout){
+    return new Promise((resolve, reject) => {
+      const cb = 'elastique_cb_' + Math.random().toString(36).slice(2);
+      const s = document.createElement('script');
+      let done = false;
+      const clean = () => { try { delete window[cb]; } catch(e){ window[cb] = undefined; } s.remove(); };
+      const timer = setTimeout(() => {
+        if (done) return;
+        done = true; clean(); reject(new Error('timeout'));
+      }, timeout || 9000);
+      window[cb] = data => {
+        if (done) return;
+        done = true; clearTimeout(timer); clean(); resolve(data);
+      };
+      s.onerror = () => {
+        if (done) return;
+        done = true; clearTimeout(timer); clean(); reject(new Error('script'));
+      };
+      s.src = url + (url.indexOf('?') > -1 ? '&' : '?') + 'callback=' + cb;
+      document.head.appendChild(s);
+    });
+  }
+
+  const SERVICES = [
+    // is.gd en JSONP — marche même en fichier local
+    async url => {
+      const d = await jsonp('https://is.gd/create.php?format=json&url=' + encodeURIComponent(url));
+      if (d && d.errormessage) throw new Error(d.errormessage);
+      return d && d.shorturl ? d.shorturl : null;
+    },
+    // v.gd, même API, autre domaine
+    async url => {
+      const d = await jsonp('https://v.gd/create.php?format=json&url=' + encodeURIComponent(url));
+      if (d && d.errormessage) throw new Error(d.errormessage);
+      return d && d.shorturl ? d.shorturl : null;
+    },
+    // spoo.me — POST formulaire, CORS ouvert
+    async url => {
+      const r = await fetch('https://spoo.me/', {
+        method:'POST',
+        headers:{ 'Accept':'application/json', 'Content-Type':'application/x-www-form-urlencoded' },
+        body:'url=' + encodeURIComponent(url)
+      });
+      const d = await r.json();
+      return d.short_url || null;
+    },
+    // cleanuri — POST formulaire, CORS ouvert
+    async url => {
+      const r = await fetch('https://cleanuri.com/api/v1/shorten', {
+        method:'POST',
+        headers:{ 'Content-Type':'application/x-www-form-urlencoded' },
+        body:'url=' + encodeURIComponent(url)
+      });
+      const d = await r.json();
+      return d.result_url || null;
+    },
+    // is.gd en direct
+    async url => {
+      const r = await fetch('https://is.gd/create.php?format=json&url=' + encodeURIComponent(url));
+      const d = await r.json();
+      return d.shorturl || null;
+    },
+    // TinyURL via relais allorigins, pour contourner l'absence de CORS
+    async url => {
+      const inner = 'https://tinyurl.com/api-create.php?url=' + encodeURIComponent(url);
+      const r = await fetch('https://api.allorigins.win/raw?url=' + encodeURIComponent(inner));
+      const txt = (await r.text()).trim();
+      return /^https?:\/\//i.test(txt) ? txt : null;
+    }
+  ];
+
+  async function shorten(url){
+    for (const service of SERVICES) {
+      try {
+        const short = await service(url);
+        if (short) return short;
+      } catch (e) {
+        console.warn('Service de raccourcissement indisponible :', e);
+      }
+    }
+    throw new Error('all-failed');
+  }
+
+  /* ---------- rallonger ---------- */
+  function lengthen(url, wanted){
+    let long = baseUrl() + '?go=' + encodeURIComponent(url);
+    let i = 1;
+    while (long.length < wanted) {
+      const seg = '&' + pick(KEYS) + '-' + i + '=' +
+                  pick(WORDS) + '-' + pick(WORDS) + '-' + pick(WORDS);
+      const room = wanted - long.length;
+      if (seg.length > room) {
+        if (room > 12) long += seg.slice(0, room).replace(/[&=-]+$/, '');
+        break;
+      }
+      long += seg;
+      i++;
+    }
+    return long;
+  }
+
+  /* ---------- affichage ---------- */
+  function showResult(source, result){
+    const a = source.length, b = result.length, max = Math.max(a, b, 1);
+    link.textContent = result;
+    link.href = result;
+    numA.textContent = a;
+    numB.textContent = b;
+
+    if (b < a) {
+      delta.innerHTML = '<b>' + (a - b) + ' caractères en moins</b> — ' +
+                        Math.round((1 - b / a) * 100) + ' % plus court.';
+    } else if (b > a) {
+      delta.innerHTML = '<b>' + (b - a) + ' caractères en plus</b> — et il marche toujours.';
+    } else {
+      delta.innerHTML = '<b>Même longueur</b> — rien n’a bougé.';
+    }
+
+    out.classList.add('show');
+    requestAnimationFrame(() => {
+      barA.style.width = (a / max * 100) + '%';
+      barB.style.width = (b / max * 100) + '%';
+    });
+    addToHistory(result);
+  }
+
+  function addToHistory(result){
+    const li = document.createElement('li');
+    const op = document.createElement('span');
+    op.className = 'op';
+    op.textContent = mode === 'shorten' ? 'Court' : 'Rallongé';
+    const a = document.createElement('a');
+    a.href = result; a.target = '_blank'; a.rel = 'noopener noreferrer';
+    a.textContent = result;
+    li.append(op, a);
+    historyList.prepend(li);
+    historyEl.classList.add('show');
+    while (historyList.children.length > 6) historyList.lastElementChild.remove();
+  }
+
+  /* ---------- action ---------- */
+  async function run(){
+    const url = normalize(input.value);
+    if (!url) { fail('Cette adresse n’est pas valide. Exemple : exemple.com/page'); input.focus(); return; }
+
+    msg.classList.remove('show');
+
+    if (mode === 'lengthen') {
+      const wanted = parseInt(size.value, 10);
+      const result = lengthen(url, wanted);
+      showResult(url, result);
+      return;
+    }
+
+    go.disabled = true;
+    const label = go.textContent;
+    go.textContent = 'Raccourcissement…';
+    try {
+      showResult(url, await shorten(url));
+    } catch (e) {
+      fail(isSandboxed()
+        ? 'Les appels réseau sont bloqués dans cet aperçu. Téléchargez le fichier et ouvrez-le directement, ou mettez-le en ligne.'
+        : 'Aucun service n’a répondu. Si la page est ouverte en fichier local, mettez-la en ligne (Vercel) : certains navigateurs bloquent ces appels depuis un fichier.');
+    } finally {
+      go.disabled = false;
+      go.textContent = label;
+    }
+  }
+
+  go.addEventListener('click', run);
+  input.addEventListener('keydown', e => { if (e.key === 'Enter') run(); });
+  input.addEventListener('input', () => msg.classList.remove('show'));
+
+  copyBtn.addEventListener('click', async () => {
+    try { await navigator.clipboard.writeText(link.textContent); }
+    catch {
+      const t = document.createElement('textarea');
+      t.value = link.textContent;
+      document.body.appendChild(t); t.select();
+      document.execCommand('copy'); t.remove();
+    }
+    copyBtn.textContent = 'Copié';
+    setTimeout(() => { copyBtn.textContent = 'Copier'; }, 1600);
+  });
+
+  input.focus();
+})();
+</script>
+</body>
+</html>
